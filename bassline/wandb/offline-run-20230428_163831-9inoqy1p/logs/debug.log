@@ -1,0 +1,24 @@
+2023-04-28 16:38:31,136 INFO    MainThread:12827 [wandb_setup.py:_flush():76] Configure stats pid to 12827
+2023-04-28 16:38:31,136 INFO    MainThread:12827 [wandb_setup.py:_flush():76] Loading settings from /home/eliott/.config/wandb/settings
+2023-04-28 16:38:31,137 INFO    MainThread:12827 [wandb_setup.py:_flush():76] Loading settings from /home/eliott/Documents/inf473v/project/bassline/wandb/settings
+2023-04-28 16:38:31,137 INFO    MainThread:12827 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2023-04-28 16:38:31,137 INFO    MainThread:12827 [wandb_setup.py:_flush():76] Applying setup settings: {'_disable_service': False}
+2023-04-28 16:38:31,137 INFO    MainThread:12827 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'bassline/train.py', 'program': '/home/eliott/Documents/inf473v/project/bassline/train.py'}
+2023-04-28 16:38:31,138 INFO    MainThread:12827 [wandb_setup.py:_flush():76] Applying login settings: {'mode': 'offline'}
+2023-04-28 16:38:31,138 INFO    MainThread:12827 [wandb_init.py:_log_setup():507] Logging user logs to /home/eliott/Documents/inf473v/project/bassline/wandb/offline-run-20230428_163831-9inoqy1p/logs/debug.log
+2023-04-28 16:38:31,139 INFO    MainThread:12827 [wandb_init.py:_log_setup():508] Logging internal logs to /home/eliott/Documents/inf473v/project/bassline/wandb/offline-run-20230428_163831-9inoqy1p/logs/debug-internal.log
+2023-04-28 16:38:31,139 INFO    MainThread:12827 [wandb_init.py:init():547] calling init triggers
+2023-04-28 16:38:31,139 INFO    MainThread:12827 [wandb_init.py:init():554] wandb.init called with sweep_config: {}
+config: {}
+2023-04-28 16:38:31,139 INFO    MainThread:12827 [wandb_init.py:init():595] starting backend
+2023-04-28 16:38:31,140 INFO    MainThread:12827 [wandb_init.py:init():599] setting up manager
+2023-04-28 16:38:31,144 INFO    MainThread:12827 [backend.py:_multiprocessing_setup():106] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2023-04-28 16:38:31,152 INFO    MainThread:12827 [wandb_init.py:init():605] backend started and connected
+2023-04-28 16:38:31,155 INFO    MainThread:12827 [wandb_init.py:init():695] updated telemetry
+2023-04-28 16:38:31,159 INFO    MainThread:12827 [wandb_init.py:init():782] starting run threads in backend
+2023-04-28 16:38:31,214 INFO    MainThread:12827 [wandb_run.py:_console_start():2157] atexit reg
+2023-04-28 16:38:31,214 INFO    MainThread:12827 [wandb_run.py:_redirect():2012] redirect: SettingsConsole.WRAP_RAW
+2023-04-28 16:38:31,214 INFO    MainThread:12827 [wandb_run.py:_redirect():2077] Wrapping output streams.
+2023-04-28 16:38:31,215 INFO    MainThread:12827 [wandb_run.py:_redirect():2102] Redirects installed.
+2023-04-28 16:38:31,215 INFO    MainThread:12827 [wandb_init.py:init():824] run started, returning control to user process
+2023-04-28 16:38:32,591 WARNING MsgRouterThr:12827 [router.py:message_loop():77] message_loop has been closed

@@ -1,0 +1,57 @@
+{
+    "os": "Linux-6.2.13-arch1-2-surface-x86_64-with-glibc2.37",
+    "python": "3.11.3",
+    "heartbeatAt": "2023-05-05T16:38:44.708808",
+    "startedAt": "2023-05-05T16:38:43.726125",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/eliott/Documents/inf473v/project/wandb_test.py",
+    "codePath": "wandb_test.py",
+    "git": {
+        "remote": null,
+        "commit": null
+    },
+    "email": "eliott.donvez@polytechnique.edu",
+    "root": "/home/eliott/Documents/inf473v/project",
+    "host": "surfacebook",
+    "username": "eliott",
+    "executable": "/usr/bin/python",
+    "cpu_count": 2,
+    "cpu_count_logical": 4,
+    "cpu_freq": {
+        "current": 3099.99975,
+        "min": 400.0,
+        "max": 3400.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 3100.01,
+            "min": 400.0,
+            "max": 3400.0
+        },
+        {
+            "current": 3099.998,
+            "min": 400.0,
+            "max": 3400.0
+        },
+        {
+            "current": 3099.986,
+            "min": 400.0,
+            "max": 3400.0
+        },
+        {
+            "current": 3099.994,
+            "min": 400.0,
+            "max": 3400.0
+        }
+    ],
+    "disk": {
+        "total": 62.702877044677734,
+        "used": 27.062606811523438
+    },
+    "memory": {
+        "total": 7.6837005615234375
+    }
+}

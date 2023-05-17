@@ -1,0 +1,57 @@
+{
+    "os": "Linux-6.2.12-arch1-1-surface-x86_64-with-glibc2.37",
+    "python": "3.10.10",
+    "heartbeatAt": "2023-04-28T14:18:29.374924",
+    "startedAt": "2023-04-28T14:18:29.286678",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/eliott/Documents/inf473v/project/bassline/train.py",
+    "codePath": "bassline/train.py",
+    "git": {
+        "remote": null,
+        "commit": null
+    },
+    "email": "eliott.donvez@polytechnique.edu",
+    "root": "/home/eliott/Documents/inf473v/project",
+    "host": "surfacebook",
+    "username": "eliott",
+    "executable": "/usr/bin/python",
+    "cpu_count": 2,
+    "cpu_count_logical": 4,
+    "cpu_freq": {
+        "current": 2800.01475,
+        "min": 400.0,
+        "max": 3400.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2800.026,
+            "min": 400.0,
+            "max": 3400.0
+        },
+        {
+            "current": 2799.989,
+            "min": 400.0,
+            "max": 3400.0
+        },
+        {
+            "current": 2800.044,
+            "min": 400.0,
+            "max": 3400.0
+        },
+        {
+            "current": 2800.0,
+            "min": 400.0,
+            "max": 3400.0
+        }
+    ],
+    "disk": {
+        "total": 62.702877044677734,
+        "used": 25.221874237060547
+    },
+    "memory": {
+        "total": 7.683696746826172
+    }
+}
