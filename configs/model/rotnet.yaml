@@ -1,0 +1,3 @@
+_target_: models.vgg.VGG
+num_classes: ${dataset.num_classes}
+frozen: True
