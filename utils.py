@@ -61,14 +61,13 @@ def print_class_distribution(dataset, output_file=None):
     plt.show()
     return
 
-def pseudo_label(model, dataloader, device, K=15, P=5):
+def generate_pseudo_labels(model, unlabeled_dataset, pseudo_labeled_dataset, device, batch_size=32, K=15, P=5):
     # keep the top P classes for each image
     # for each class; keep the top K images
     # return a new dataloader with num_classes * K images
     # get the predictions
     model.eval()
-    shuffle = dataloader.shuffle
-    dataloader.shuffle = False
+    dataloader = data.DataLoader(unlabeled_dataset, batch_size=batch_size, shuffle=False)
     # for each class, create a list of tuple (index, score)
     lists = [[] for _ in range(model.num_classes)]
 
@@ -91,20 +90,23 @@ def pseudo_label(model, dataloader, device, K=15, P=5):
         lists[i] = lists[i][:K]
     # lists has shape (num_classes, K)
     # lists[i] is a list of tuple (index, score) for class i
-    # create a new dataset
+    # create unlabeled_dataset
     new_dataset = []
+    indices = []
     for i in range(model.num_classes):
         for j in range(K):
-            new_dataset.append(dataloader.dataset[lists[i][j][0]], i)
-    dataloader.shuffle = shuffle
-    return data.DataLoader(new_dataset, batch_size=dataloader.batch_size, shuffle=dataloader.shuffle, num_workers=dataloader.num_workers)
-
-def join(dataloader1, dataloader2):
-    # join two dataloaders
-    # return a new dataloader
-    dataset = data.ConcatDataset([dataloader1.dataset, dataloader2.dataset])
-    return data.DataLoader(dataset, batch_size=dataloader1.batch_size, shuffle=dataloader1.shuffle, num_workers=dataloader1.num_workers)
-
+            index = lists[i][j][0]
+            new_dataset.append(dataloader.dataset[index], i)
+            indices.append(index)
+    # turn new_dataset into a Dataset object
+    new_dataset = data.TensorDataset(torch.stack([x[0] for x in new_dataset]), torch.tensor([x[1] for x in new_dataset]))
+    # remove the pseudo labels from the original dataset
+    new_unlabeled = data.Subset(dataloader.dataset, list(set(range(len(dataloader.dataset))) - set(indices)))
+    if pseudo_labeled_dataset is None:
+        pseudo_labeled_dataset = new_dataset
+    else:   
+        pseudo_labeled_dataset = data.ConcatDataset([pseudo_labeled_dataset, new_dataset])
+    return (pseudo_labeled_dataset, new_unlabeled)
 
 
             
