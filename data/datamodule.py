@@ -100,6 +100,8 @@ class DataModule:
         remaining_loader = DataLoader(Subset(self.unlabelled_dataset, self.remaining), batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
         
         scores, classes = torch.Tensor([]), torch.Tensor([])
+        scores.to(device)
+        classes.to(device)
         with torch.no_grad():
             for batch in remaining_loader:
                 batch = batch.to(device)
