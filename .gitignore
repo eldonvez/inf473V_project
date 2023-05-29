@@ -8,3 +8,4 @@ inf473v-2023-challenge-v2.zip
 __pycache__/
 wandb/
 outputs/
+checkpoints/
