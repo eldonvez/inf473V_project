@@ -173,9 +173,16 @@ class DataModule:
         targets = by_classes[:,0].int()
         print(f"targets: {targets}")
         assert targets.shape == (len(indices),)
+<<<<<<< HEAD
         images = images.cpu()
         targets = targets.cpu()
         
+=======
+        # send images and targets back to the cpu for storage
+        images = images.cpu()
+        targets = targets.cpu()
+
+>>>>>>> 0dc36867730f668243a3f4bee02ceed74d00bc35
         new_dataset = torch.utils.data.TensorDataset(images, targets)
         # create a new dataloader with the newly labeled images
         if pseudo_label_loader is not None:
