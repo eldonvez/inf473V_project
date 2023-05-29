@@ -5,7 +5,7 @@ import torch
 from tqdm import tqdm
 import itertools
 from hydra.core.hydra_config import HydraConfig
-
+import os
 @hydra.main(config_path="configs", config_name="config")
 def main(cfg): 
     run_name = HydraConfig.get().job.override_dirname
@@ -13,7 +13,6 @@ def main(cfg):
     print (run_name)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     datamodule = hydra.utils.instantiate(cfg.datamodule)
-    return
     teacher = hydra.utils.instantiate(cfg.teacher)
     optimizer = hydra.utils.instantiate(cfg.optimizer, teacher.parameters())
     criterion = hydra.utils.instantiate(cfg.criterion)
@@ -25,7 +24,7 @@ def main(cfg):
     train_loader = datamodule.dloader_labeled()
 
     if cfg.cross_validation == False:
-        checkpoint_path = "checkpoints/" + run_name
+        checkpoint_path = os.path.join(hydra.utils.get_original_cwd(), "checkpoints/" + run_name)
         train_teacher(teacher, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path)
         train_student(student, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path)
         finetune_student(student, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path)
@@ -33,7 +32,7 @@ def main(cfg):
         cross_folds = datamodule.generate_folds(5)
         val_acc = [0]*5
         for i, (train_loader, val_loader) in enumerate(cross_folds):
-            checkpoint_path = "checkpoints/" + run_name + "_" + str(i)
+            checkpoint_path = os.path.join(hydra.utils.get_original_cwd(), "checkpoints/"+run_name+"_"+str(i))
             train_teacher(teacher, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path, val_loader)
             train_student(student, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path, val_loader)
             finetune_student(student, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path, val_loader)
@@ -55,7 +54,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
         epoch_loss = 0
         epoch_num_correct = 0
         num_samples = 0
-        for j, batch in enumerate(train_loader):
+        for j, batch in tqdm(enumerate(train_loader)):
             images, labels = batch
             images = images.to(device)
             labels = labels.to(device)
@@ -84,7 +83,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
         num_samples = 0
 
         if val_loader is not None:
-            for j, batch in enumerate(val_loader):
+            for j, batch in tqdm(enumerate(val_loader)):
                 images, labels = batch
                 images = images.to(device)
                 labels = labels.to(device)
@@ -117,7 +116,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
         num_samples = 0
         pseudo_loss_weight = max_weight * (epoch / pseudolabeling_epochs)
         loader = itertools.zip_longest(train_loader, pseudo_loader)
-        for j, (batch, pseudo_batch) in loader:
+        for j, (batch, pseudo_batch) in tqdm(enumerate(loader)):
             images, labels = batch
             images = images.to(device)
             labels = labels.to(device)
@@ -152,7 +151,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
             epoch_loss = 0
             epoch_num_correct = 0
             num_samples = 0
-            for j, batch in enumerate(val_loader):
+            for j, batch in tqdm(enumerate(val_loader)):
                 images, labels = batch
                 images = images.to(device)
                 labels = labels.to(device)
@@ -188,7 +187,7 @@ def train_student(teacher, student, train_loader, datamodule, logger, optimizer,
         epoch_loss = 0
         epoch_num_correct = 0
         num_samples = 0
-        for j, batch in enumerate(train_loader):
+        for j, batch in tqdm(enumerate(train_loader)):
             images, labels = batch
             images = images.to(device)
             labels = labels.to(device)
@@ -217,7 +216,7 @@ def train_student(teacher, student, train_loader, datamodule, logger, optimizer,
         num_samples = 0
 
         if val_loader is not None:
-            for j, batch in enumerate(val_loader):
+            for j, batch in tqdm(enumerate(val_loader)):
                 images, labels = batch
                 images = images.to(device)
                 labels = labels.to(device)
@@ -253,7 +252,7 @@ def finetune_student(student, finetune_epochs, optimizer, criterion, device, tra
         epoch_loss = 0
         epoch_num_correct = 0
         num_samples = 0
-        for j, batch in enumerate(train_loader):
+        for j, batch in tqdm(enumerate(train_loader)):
             images, labels = batch
             images = images.to(device)
             labels = labels.to(device)
@@ -281,7 +280,7 @@ def finetune_student(student, finetune_epochs, optimizer, criterion, device, tra
         num_samples = 0
 
         if val_loader is not None:
-            for j, batch in enumerate(val_loader):
+            for j, batch in tqdm(enumerate(val_loader)):
                 images, labels = batch
                 images = images.to(device)
                 labels = labels.to(device)
@@ -309,7 +308,7 @@ def evaluate(model, val_loader, device):
     model.eval()
     num_correct = 0
     num_samples = 0
-    for j, batch in enumerate(val_loader):
+    for j, batch in tqdm(enumerate(val_loader)):
         images, labels = batch
         images = images.to(device)
         labels = labels.to(device)

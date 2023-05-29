@@ -5,7 +5,7 @@ import torch.nn as nn
 class ResNetFinetune(nn.Module):
     def __init__(self, num_classes, frozen=False, name="resnet50"):
         super().__init__()
-        self.backbone = torchvision.models.resnet50(pretrained=True)
+        self.backbone = torchvision.models.resnet50()
         self.backbone.fc = nn.Identity()
         if frozen:
             for param in self.backbone.parameters():

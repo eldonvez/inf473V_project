@@ -7,7 +7,7 @@ defaults:
 
 
 warmup_epochs: 100
-epochs: 200
+pseudolabeling_epochs: 200
 max_weight: 1 
 self_train: False
 cross_validation: True
@@ -15,7 +15,7 @@ cross_validation: True
 datamodule:
   _target_: data.datamodule.DataModule
   train_dataset_path: ${data_dir}/${dataset.train_path}
-  unlabeled_dataset_path: ${data_dir}/${dataset.train_path}
+  unlabeled_dataset_path: ${data_dir}/${dataset.unlabeled_path}
   train_transform: ${dataset.transform}
   batch_size: 128
   num_workers: 8
@@ -28,6 +28,11 @@ hydra:
     dir: outputs/${hydra.job.override_dirname}
   job:
     chdir: true
+    config:
+      override_dirname:
+        exclude_keys: 
+          - datamodule.batch_size
+          - datamodule.num_workers
   sweep: 
     dir: outputs
     subdir: ${hydra.job.override_dirname}

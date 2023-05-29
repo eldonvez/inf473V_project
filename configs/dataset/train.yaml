@@ -1,6 +1,6 @@
 defaults:
   - transform: simple
-num_classes: 10
+num_classes: 48
 batch_size: 128
 num_workers: 8
 train_path: train
