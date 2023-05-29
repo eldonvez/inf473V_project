@@ -122,8 +122,8 @@ class DataModule:
         assert scores.shape == (len(self.remaining), self.top_p)
         # scores, classes have shape (len(remaining), self.top)
         # get the top K predictions for each class
-        print(f"classes shape: {classes.shape}")
-        print(classes)
+        #print(f"classes shape: {classes.shape}")
+        #print(classes)
         by_classes = torch.zeros((self.num_classes, self.top_k, 2), device=device)
         for i in range(self.num_classes):
             # get the indices of all images with class i in their top self.top
@@ -143,7 +143,7 @@ class DataModule:
                 class_i = torch.cat((class_i, torch.zeros((self.top_k - class_i.shape[0], 2), device=device)), dim=0)
 
             # class_i has shape (self.top_k, 2)
-            print(class_i.shape)
+            #print(class_i.shape)
             assert class_i.shape == (self.top_k, 2)
             by_classes[i] = class_i
         
@@ -166,23 +166,17 @@ class DataModule:
         # create a new dataset with the newly labeled images
         # remaining_loader.dataset[i] returns the i-th image in the remaining dataset, i.e. a tensor.
         assert len(indices) > 0 
-        print(f"indices: {indices}")
+        #print(f"indices: {indices}")
         
         images = [remaining_loader.dataset[i] for i in indices]
         images = torch.stack(images, dim=0)
         targets = by_classes[:,0].int()
-        print(f"targets: {targets}")
+        #print(f"targets: {targets}")
         assert targets.shape == (len(indices),)
-<<<<<<< HEAD
-        images = images.cpu()
-        targets = targets.cpu()
-        
-=======
         # send images and targets back to the cpu for storage
         images = images.cpu()
         targets = targets.cpu()
 
->>>>>>> 0dc36867730f668243a3f4bee02ceed74d00bc35
         new_dataset = torch.utils.data.TensorDataset(images, targets)
         # create a new dataloader with the newly labeled images
         if pseudo_label_loader is not None:

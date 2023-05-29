@@ -116,7 +116,8 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
         epoch_num_correct = 0
         num_samples = 0
         pseudo_loss_weight = max_weight * (epoch / pseudolabeling_epochs)
-        print(pseudo_loader.dataset[0])
+        #print(pseudo_loader.dataset[0])
+        teacher.to(device)
         for j , (batch, pseudo_batch) in tqdm(enumerate(itertools.zip_longest(train_loader, pseudo_loader))):
             if pseudo_batch is None:
                 images, labels = batch
@@ -124,7 +125,14 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
                 labels = labels.to(device)
                 preds = teacher(images)
                 loss = criterion(preds, labels)
-            else:
+            elif batch is None:
+                pseudo_images, pseudo_labels = pseudo_batch
+                pseudo_images = pseudo_images.to(device)
+                pseudo_labels = pseudo_labels.to(device)
+                pseudo_preds = teacher(pseudo_images)
+                loss = pseudo_loss_weight * criterion(pseudo_preds, pseudo_labels)
+
+            else: 
                 images, labels = batch
                 pseudo_images, pseudo_labels = pseudo_batch
                 images.to(device)
@@ -134,6 +142,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
                 preds = teacher(images)
                 pseudo_preds = teacher(pseudo_images)
                 loss = criterion(preds, labels) + pseudo_loss_weight * criterion(pseudo_preds, pseudo_labels)
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
