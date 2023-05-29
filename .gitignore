@@ -9,3 +9,4 @@ __pycache__/
 wandb/
 outputs/
 checkpoints/
+checkpoints/
