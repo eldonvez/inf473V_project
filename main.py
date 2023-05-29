@@ -14,10 +14,11 @@ import itertools
 import numpy as np
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# experiment name = run+date+time
 logger = wandb.init(project="inf473v", name="run")
 
 @hydra.main(config_path="configs", config_name="config")
-def train(cfg):
+def train_teacher(cfg):
     teacher = hydra.utils.instantiate(cfg.teacher)
     optimizer = hydra.utils.instantiate(cfg.optimizer, teacher.parameters())
     criterion = hydra.utils.instantiate(cfg.criterion)
@@ -95,7 +96,7 @@ def train(cfg):
             # feed one batch at a time of labeled and unlabeled data
             pseudo_loader = DataLoader(unlabeled_dataset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers)
             loader = itertools.zip_longest(train_loader, pseudo_loader)
-            for i, (batch, pseudo_batch) in enumerate(loader):
+            for j, (batch, pseudo_batch) in enumerate(loader):
                 if batch is not None:
                     batch.to(device)
                     images, labels = batch
@@ -171,6 +172,12 @@ def train(cfg):
     val_acc = np.array(val_acc)
     print("Average val accuracy: ", np.mean(val_acc))
     print("Standard deviation: ", np.std(val_acc))
+    # log results
+    logger.log({"val_acc": val_acc})
+    logger.log({"mean_val_acc": np.mean(val_acc)})
+    logger.log({"std_val_acc": np.std(val_acc)})
+
+
 
 
 
@@ -187,4 +194,4 @@ def train(cfg):
 
 
 if __name__ == "__main__":
-    train()
+    train_teacher()

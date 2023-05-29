@@ -2,10 +2,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
 
 class VGG(nn.Module):
     def __init__(self, num_classes, pretrained=True, frozen=True):
-        super.__init__()
+        super(VGG, self).__init__()
         self.pretrained = pretrained
         self.vgg = torchvision.models.vgg16(pretrained=self.pretrained)
         self.vgg.classifier[6] = nn.Linear(4096, num_classes)
@@ -20,3 +21,8 @@ class VGG(nn.Module):
     def forward(self, x):
         return self.vgg(x)
     
+
+
+if __name__ == "__main__":
+    model = VGG(10)
+    print(model)

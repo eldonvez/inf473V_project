@@ -1,0 +1,3 @@
+_target_: models.resnet50.ResNetFinetune
+num_classes: ${dataset.num_classes}
+frozen: True

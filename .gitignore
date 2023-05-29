@@ -6,3 +6,5 @@ compressed_dataset/test
 inf473v-2023-challenge-v2.zip
 ._compressed_dataset
 __pycache__/
+wandb/
+outputs/

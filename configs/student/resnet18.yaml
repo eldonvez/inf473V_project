@@ -1,0 +1,4 @@
+_target_: models.resnet18.ResNetFinetuneSmaller
+num_classes: ${dataset.num_classes}
+frozen: True
+pretrained: False

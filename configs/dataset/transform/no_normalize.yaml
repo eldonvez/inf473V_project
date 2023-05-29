@@ -1,0 +1,6 @@
+_target_: torchvision.transforms.Compose
+transforms:
+  - _target_: torchvision.transforms.Resize
+    size: [224, 224]
+  - _target_: torchvision.transforms.ToTensor
+  

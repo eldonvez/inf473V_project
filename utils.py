@@ -47,19 +47,7 @@ def balance_data(dataset, batch_size=1, shuffle=True, num_workers=1):
     balanced_dataset = data.Subset(dataset, index)
     return (data.DataLoader(balanced_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers), lcm)
 
-def print_class_distribution(dataset, output_file=None):
-    # print the class distribution of the dataset
-    _, counts = np.unique(dataset.targets, return_counts=True)
-    print("Class distribution:")
-    # plot the histogram 
-    plt.bar(np.arange(len(counts)), counts)
-    plt.xticks(np.arange(len(counts)))
-    plt.xlabel("Class")
-    plt.ylabel("Count")
-    if output_file is not None:
-        plt.savefig(output_file)
-    plt.show()
-    return
+
 
 def generate_pseudo_labels(model, unlabeled_dataset, pseudo_labeled_dataset, device, batch_size=32, K=15, P=5):
     # keep the top P classes for each image
@@ -108,7 +96,14 @@ def generate_pseudo_labels(model, unlabeled_dataset, pseudo_labeled_dataset, dev
         pseudo_labeled_dataset = data.ConcatDataset([pseudo_labeled_dataset, new_dataset])
     return (pseudo_labeled_dataset, new_unlabeled)
 
-
+def get_run_name(cfg):
+    run_name = (f"{cfg.teacher.name}_{'frozen' if cfg.teacher.frozen else 'unfrozen'}_"
+        f"{'selfTrain' if cfg.self_train else (cfg.student.name+('_pretrained' if cfg.student.pretrained else ''))}_"
+        f"{cfg.dataset.transform.name}_{cfg.dataset.name}_{cfg.warmup_epochs}warmup_"
+        f"{cfg.epochs}epochs_{cfg.datamodule.batch_size}batch_{cfg.optimizer._target_}_"
+        f"{cfg.optimizer.lr}lr_{'Xvalid' if cfg.datamodule.cross_validation else ''}_"
+        f"{cfg.max_weight}pseudoloss")
+    return (run_name)
             
             
 

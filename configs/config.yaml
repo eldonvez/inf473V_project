@@ -1,25 +1,33 @@
 defaults:
-  - model: resnet
+  - teacher: resnet50
+  - student: resnet18
   - dataset: train
-  - optim: adamw
-  - loss_fn: cross_entropy
+  - optimizer: adamw
+  - criterion: cross_entropy
 
-epochs: 100
+
+warmup_epochs: 100
+epochs: 200
+max_weight: 1 
+self_train: False
+cross_validation: True
 
 datamodule:
   _target_: data.datamodule.DataModule
   train_dataset_path: ${data_dir}/${dataset.train_path}
-  val_dataset_path: ${data_dir}/${dataset.val_path}
-  train_transform: ${dataset.train_transform}
-  val_transform: ${dataset.test_transform}
+  unlabeled_dataset_path: ${data_dir}/${dataset.train_path}
+  train_transform: ${dataset.transform}
   batch_size: 128
   num_workers: 8
 
-data_dir: ${root_dir}/../../dataset_train
+data_dir: ${root_dir}/compressed_dataset
 root_dir:  ${hydra:runtime.cwd}
 
 hydra:
   run:
-    dir: outputs/${hydra.job.name}/${now:%Y-%m-%d_%H-%M-%S}/
+    dir: outputs/${hydra.job.override_dirname}
   job:
     chdir: true
+  sweep: 
+    dir: outputs
+    subdir: ${hydra.job.override_dirname}

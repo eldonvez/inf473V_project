@@ -16,3 +16,7 @@ class ResNetFinetuneSmaller(nn.Module):
         x = self.backbone(x)
         x = self.classifier(x)
         return x
+    
+if __name__ == "__main__":
+    model = ResNetFinetuneSmaller(10)
+    print(model)
