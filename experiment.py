@@ -60,7 +60,6 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
             labels = labels.to(device)
             preds = teacher(images)
             loss = criterion(preds, labels)
-            logger.log({"loss": loss.detach().cpu().numpy()})
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -75,7 +74,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
             {
                 "epoch": epoch,
                 "train_loss_epoch": epoch_loss,
-                "train_acc": epoch_acc,
+                "train_acc_epoch": epoch_acc,
             }
         )
         epoch_loss = 0
@@ -100,7 +99,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
                 {
                     "epoch": epoch,
                     "val_loss_epoch": epoch_loss,
-                    "val_acc": epoch_acc,
+                    "val_acc_epoch": epoch_acc,
                 }
             )
     # save every 10 epochs
@@ -111,6 +110,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
     pseudo_loader = None
     for epoch in tqdm(range(pseudolabeling_epochs)):
         pseudo_loader = datamodule.add_labels(teacher, pseudo_loader, device)
+        teacher.train()
         epoch_loss = 0
         epoch_num_correct = 0
         num_samples = 0

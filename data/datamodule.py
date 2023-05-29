@@ -8,6 +8,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
+from tqdm import tqdm
 
 class DataModule:
     def __init__(
@@ -94,25 +95,31 @@ class DataModule:
         # return a new dataloader with the newly labeled images
 
         # get the predictions of the model on the unlabeled dataset
+        model.to(device)
+        model.eval()
         if self.remaining == []:
             return pseudo_label_loader
         
         remaining_loader = DataLoader(Subset(self.unlabelled_dataset, self.remaining), batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
         
-        scores, classes = torch.Tensor([]), torch.Tensor([])
-        scores.to(device)
-        classes.to(device)
+        scores, classes = torch.empty((0, self.top_p), device=device), torch.empty((0, self.top_p), device=device)
+
         with torch.no_grad():
-            for batch in remaining_loader:
+            for batch in tqdm(remaining_loader):
                 batch = batch.to(device)
                 output = model(batch)
                 # for each image, get the top P predictions
                 score, pred = torch.topk(output, self.top_p, dim=1)
+                score.to(device)
+                pred.to(device)
+
+                
                 scores = torch.cat((scores, score), dim=0)
                 classes = torch.cat((classes, pred), dim=0)
+        assert scores.shape == (len(self.remaining), self.top_p)
         # scores, classes have shape (len(remaining), self.top)
         # get a tensor of shape (num_classes, K) whose entries are tuples (position, score) of all images with class i in their top self.top
-        by_classes = torch.empty((self.num_classes, self.top_k, 2))
+        by_classes = torch.zeros((self.num_classes, self.top_p, 2), device=device)
         for i in range(self.num_classes):
             # get the indices of all images with class i in their top self.top
             idx = torch.where(classes == i)
@@ -123,7 +130,10 @@ class DataModule:
             class_i = class_i[class_i[:,1].argsort(descending=True)]
             # get the top K scores
             class_i = class_i[:self.top_k]
+            # class_i has shape (self.top_k, 2)
             by_classes[i] = class_i
+            assert class_i.shape == (self.top_k, 2)
+        
         # by_classes has shape (num_classes, self.top_k, 2)
         # linearize into a tensor of shape (num_classes * self.top_k, 3) with entries (class, position, score)
         by_classes = torch.stack(torch.arange(self.num_classes).unsqueeze(-1).unsqueeze(-1),by_classes, dim=-1)
