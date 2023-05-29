@@ -20,7 +20,7 @@ class DataModule:
         num_workers,
         top_k=15,
         top_p=5,
-        threshold=0.95,
+        threshold=0,
     ):
         self.num_classes = len(os.listdir(train_dataset_path))
         self.labeled_dataset = ImageFolder(train_dataset_path, transform=train_transform)
@@ -28,7 +28,7 @@ class DataModule:
         # load images from unlabeled_dataset_path and apply train_transform without calling ImageFolder
         self.unlabelled_dataset = UnlabeledDataset(unlabeled_dataset_path, train_transform, batch_size, num_workers)
         # for debugging purposes, we only use a small subset of the unlabeled dataset
-        self.unlabelled_dataset = Subset(self.unlabelled_dataset, list(range(0, 1000)))
+        self.unlabelled_dataset = Subset(self.unlabelled_dataset, list(range(0, 10000)))
         self.num_workers = num_workers
         self.batch_size = batch_size
         self.already_labeled = []
@@ -110,6 +110,7 @@ class DataModule:
             for batch in tqdm(remaining_loader):
                 batch = batch.to(device)
                 output = model(batch)
+                output = torch.softmax(output, dim=1)
                 # for each image, get the top P predictions
                 score, pred = torch.topk(output, self.top_p, dim=1)
                 score.to(device)
@@ -165,10 +166,16 @@ class DataModule:
         # create a new dataset with the newly labeled images
         # remaining_loader.dataset[i] returns the i-th image in the remaining dataset, i.e. a tensor.
         assert len(indices) > 0 
+        print(f"indices: {indices}")
+        
         images = [remaining_loader.dataset[i] for i in indices]
         images = torch.stack(images, dim=0)
         targets = by_classes[:,0].int()
+        print(f"targets: {targets}")
         assert targets.shape == (len(indices),)
+        images = images.cpu()
+        targets = targets.cpu()
+        
         new_dataset = torch.utils.data.TensorDataset(images, targets)
         # create a new dataloader with the newly labeled images
         if pseudo_label_loader is not None:

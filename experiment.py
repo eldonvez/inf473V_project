@@ -110,38 +110,39 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
     pseudo_loader = None
     for epoch in tqdm(range(pseudolabeling_epochs)):
         pseudo_loader = datamodule.add_labels(teacher, pseudo_loader, device)
+        
         teacher.train()
         epoch_loss = 0
         epoch_num_correct = 0
         num_samples = 0
         pseudo_loss_weight = max_weight * (epoch / pseudolabeling_epochs)
-        loader = itertools.zip_longest(train_loader, pseudo_loader)
-        for batch, pseudo_batch in tqdm(loader):
-            # reset loss and pseudo_loss in case one of the batches is None
-            loss = 0
-            pseudo_loss = 0
-            if batch is not None:
+        print(pseudo_loader.dataset[0])
+        for j , (batch, pseudo_batch) in tqdm(enumerate(itertools.zip_longest(train_loader, pseudo_loader))):
+            if pseudo_batch is None:
                 images, labels = batch
                 images = images.to(device)
                 labels = labels.to(device)
                 preds = teacher(images)
                 loss = criterion(preds, labels)
-            if pseudo_batch is not None:
-                images, pseudo_labels = pseudo_batch
-                images = images.to(device)
-                pseudo_labels = pseudo_labels.to(device)
+            else:
+                images, labels = batch
+                pseudo_images, pseudo_labels = pseudo_batch
+                images.to(device)
+                labels.to(device)
+                pseudo_images.to(device)
+                pseudo_labels.to(device)
                 preds = teacher(images)
-                pseudo_loss = criterion(preds, pseudo_labels)
-            loss = loss + pseudo_loss_weight * pseudo_loss
-
+                pseudo_preds = teacher(pseudo_images)
+                loss = criterion(preds, labels) + pseudo_loss_weight * criterion(pseudo_preds, pseudo_labels)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            epoch_loss += loss.detach().cpu().numpy() * len(images)
+            epoch_loss += loss.detach().cpu().numpy() * (len (images) + len(pseudo_images))
             epoch_num_correct += (
-                (preds.argmax(1) == labels).sum().detach().cpu().numpy()
-            )
-            num_samples += len(images)
+                    (preds.argmax(1) == labels).sum().detach().cpu().numpy()
+                    + (pseudo_preds.argmax(1) == pseudo_labels).sum().detach().cpu().numpy()
+                )
+            num_samples += len(images) + len(pseudo_images)
         epoch_loss /= num_samples
         epoch_acc = epoch_num_correct / num_samples
         logger.log(
@@ -151,6 +152,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
                 "train_acc": epoch_acc,
             }
         )
+
 
 
         if val_loader is not None:
