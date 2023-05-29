@@ -20,6 +20,7 @@ datamodule:
   batch_size: 128
   num_workers: 6
 
+
 data_dir: ${root_dir}/compressed_dataset
 root_dir:  ${hydra:runtime.cwd}
 
@@ -28,6 +29,11 @@ hydra:
     dir: outputs/${hydra.job.override_dirname}
   job:
     chdir: true
+    config:
+      override_dirname:
+        exclude_keys: 
+          - datamodule.batch_size
+          - datamodule.num_workers
   sweep: 
     dir: outputs
     subdir: ${hydra.job.override_dirname}
