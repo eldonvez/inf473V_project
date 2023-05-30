@@ -14,20 +14,29 @@ def main(cfg):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     datamodule = hydra.utils.instantiate(cfg.datamodule)
     teacher = hydra.utils.instantiate(cfg.teacher)
-    optimizer = hydra.utils.instantiate(cfg.optimizer, teacher.parameters())
-    criterion = hydra.utils.instantiate(cfg.criterion)
     if cfg.self_train == True:
         student = teacher
     else: 
         student = hydra.utils.instantiate(cfg.student)
+    optimizer = hydra.utils.instantiate(cfg.optimizer, teacher.parameters())
+    criterion = hydra.utils.instantiate(cfg.criterion)
 
+    # rotnet = hydra.utils.instantiate(cfg.rotnet)
+    # optimizer_rotnet = hydra.utils.instantiate(cfg.optimizer, rotnet.parameters())
+
+    # rotnet_train_loader, rotnet_val_loader = datamodule.dloader_rotnet(cfg.cross_validation)
+    # checkpoint_path = os.path.join(hydra.utils.get_original_cwd(), "checkpoints/" + run_name+"rotnet")
+
+    # train_rotnet(rotnet, rotnet_train_loader, optimizer_rotnet, criterion, device, logger, checkpoint_path, val_loader = rotnet_val_loader)
+
+    optimizer_student = hydra.utils.instantiate(cfg.optimizer, student.parameters())
     train_loader = datamodule.dloader_labeled()
 
     if cfg.cross_validation == False:
         checkpoint_path = os.path.join(hydra.utils.get_original_cwd(), "checkpoints/" + run_name)
         train_teacher(teacher, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path)
-        train_student(student, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path)
-        finetune_student(student, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path)
+        train_student(student, train_loader, datamodule, logger, optimizer_student, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path)
+        finetune_student(student, train_loader, datamodule, logger, optimizer_student, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path)
     else:
         cross_folds = datamodule.generate_folds(5)
         val_acc = [0]*5
@@ -50,6 +59,9 @@ def main(cfg):
 def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criterion, device, warmup_epochs, pseudolabeling_epochs, max_weight, checkpoint_path, val_loader=None):
     teacher.to(device)
     wandb.watch(teacher)
+    class_weights = datamodule.get_class_weights().to(device)
+    print (class_weights)
+    print (class_weights.dtype)
     for epoch in tqdm(range(warmup_epochs)):
         epoch_loss = 0
         epoch_num_correct = 0
@@ -59,7 +71,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
             images = images.to(device)
             labels = labels.to(device)
             preds = teacher(images)
-            loss = criterion(preds, labels)
+            loss = criterion(preds, labels, weight=class_weights)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -109,7 +121,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
     # pseudo-labeling
     pseudo_loader = None
     for epoch in tqdm(range(pseudolabeling_epochs)):
-        pseudo_loader = datamodule.add_labels(teacher, pseudo_loader, device)
+        pseudo_loader = datamodule.add_labels2(teacher, pseudo_loader, device)
         
         teacher.train()
         epoch_loss = 0
@@ -128,20 +140,29 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
             elif batch is None:
                 pseudo_images, pseudo_labels = pseudo_batch
                 pseudo_images = pseudo_images.to(device)
-                pseudo_labels = pseudo_labels.to(device)
+                pseudo_labels = pseudo_labels.type(torch.LongTensor).to(device)
                 pseudo_preds = teacher(pseudo_images)
                 loss = pseudo_loss_weight * criterion(pseudo_preds, pseudo_labels)
 
             else: 
                 images, labels = batch
                 pseudo_images, pseudo_labels = pseudo_batch
-                images.to(device)
-                labels.to(device)
-                pseudo_images.to(device)
-                pseudo_labels.to(device)
+                images = images.to(device)
+                labels = labels.to(device)
+                pseudo_images = pseudo_images.to(device)
+                pseudo_labels = pseudo_labels.type(torch.LongTensor).to(device)
+                #print(type(images))
+                
                 preds = teacher(images)
                 pseudo_preds = teacher(pseudo_images)
-                loss = criterion(preds, labels) + pseudo_loss_weight * criterion(pseudo_preds, pseudo_labels)
+                loss = criterion(preds, labels)
+                # print(pseudo_labels.shape)
+                # print(pseudo_preds.shape)
+                # print(f"pseudo_preds type: {pseudo_preds.dtype}")
+                # print(f"labels type: {labels.dtype}")
+
+                pseudo_loss = criterion(pseudo_preds, pseudo_labels)
+                loss = loss + pseudo_loss_weight * pseudo_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -334,7 +355,65 @@ def evaluate(model, val_loader, device):
         num_samples += len(images)
     return num_correct / num_samples
 
+def train_rotnet(model, train_loader, optimizer, criterion, device, epochs, logger, checkpoint_path, val_loader=None):
+    model.to(device)
+    for epoch in tqdm(range(epochs)):
+        epoch_loss = 0
+        epoch_num_correct = 0
+        num_samples = 0
+        for j, batch in tqdm(enumerate(train_loader)):
+            batch = utils.generate_rotations(batch)
+            images, labels = batch
+            images = images.to(device)
+            labels = labels.to(device)
+            preds = model(images)
+            loss = criterion(preds, labels)
+            logger.log({"loss": loss.detach().cpu().numpy()})
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.detach().cpu().numpy() * len(images)
+            epoch_num_correct += (
+                (preds.argmax(1) == labels).sum().detach().cpu().numpy()
+            )
+            num_samples += len(images)
+        epoch_loss /= num_samples
+        epoch_acc = epoch_num_correct / num_samples
+        logger.log(
+            {
+                "rot_epoch": epoch,
+                "rot_train_loss_epoch": epoch_loss,
+                "rot_train_acc": epoch_acc,
+            }
+        )
+        epoch_loss = 0
+        epoch_num_correct = 0
+        num_samples = 0
 
+        if val_loader is not None:
+            for j, batch in tqdm(enumerate(val_loader)):
+                batch = utils.generate_rotations(batch)
+                images, labels = batch
+                images = images.to(device)
+                labels = labels.to(device)
+                preds = model(images)
+                loss = criterion(preds, labels)
+                epoch_loss += loss.detach().cpu().numpy() * len(images)
+                epoch_num_correct += (
+                    (preds.argmax(1) == labels).sum().detach().cpu().numpy()
+                )
+                num_samples += len(images)
+            epoch_loss /= num_samples
+            epoch_acc = epoch_num_correct / num_samples
+            logger.log(
+                {
+                    "rot_epoch": epoch,
+                    "rot_val_loss_epoch": epoch_loss,
+                    "rot_val_acc": epoch_acc,
+                }
+            )
+    # save the model
+    torch.save(model.state_dict(), checkpoint_path+"rot.pth")
 
 
 

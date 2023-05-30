@@ -5,3 +5,4 @@ batch_size: 128
 num_workers: 8
 train_path: train
 unlabeled_path: unlabelled
+test_path: test 

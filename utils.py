@@ -107,6 +107,11 @@ def get_run_name(cfg):
             
             
 
+def generate_rotations(batch):
+    # get a batch (num images, 3, H, W) and return a batch ( (num images * 4, 3, H, W) , (num images * 4) )
+    # the second element is the label of the rotation
+    labels = torch.tensor([0, 1, 2, 3] * len(batch))
+    return (torch.cat([batch, batch.rot90(1, dims=(2, 3)), batch.rot90(2, dims=(2, 3)), batch.rot90(3, dims=(2, 3))]), labels)
 
 
 

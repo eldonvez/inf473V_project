@@ -1,3 +1,4 @@
-_target_: models.resnet50.ResNetFinetune
+_target_: models.vgg.VGG
 num_classes: ${dataset.num_classes}
 frozen: False
+pretrained: True
