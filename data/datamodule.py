@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 from tqdm import tqdm
+import torch.nn.functional as F
 
 class DataModule:
     def __init__(
@@ -18,14 +19,16 @@ class DataModule:
         train_transform,
         batch_size,
         num_workers,
-        top_k=15,
+        top_k=80,
         top_p=5,
-        threshold=0,
+        threshold=0.9,
     ):
         self.num_classes = len(os.listdir(train_dataset_path))
         self.labeled_dataset = ImageFolder(train_dataset_path, transform=train_transform)
         # unlabeled dataset is a dataset with no labels so it is not an ImageFolder.
         # load images from unlabeled_dataset_path and apply train_transform without calling ImageFolder
+        self.unlabeled_path = unlabeled_dataset_path
+        self.transform = train_transform
         self.unlabelled_dataset = UnlabeledDataset(unlabeled_dataset_path, train_transform, batch_size, num_workers)
         # for debugging purposes, we only use a small subset of the unlabeled dataset
         self.unlabelled_dataset = Subset(self.unlabelled_dataset, list(range(0, 10000)))
@@ -90,6 +93,16 @@ class DataModule:
         plt.show()
         return
     
+    def get_class_weights(self):
+        # return the class distribution of the dataset as a tensor of size (num_classes,) for balancing the loss
+        _, counts = np.unique(self.labeled_dataset.targets, return_counts=True)
+        # weight the samples as the inverse of the class frequency for the class they belong to.
+        # the weight of a class is the number of samples in the most populated class divided by the number of samples in the current class
+        weight = torch.tensor([max(counts)/count for count in counts])
+        # as float32 tensor
+        weight = weight.type(torch.float32)
+
+        return weight
     def add_labels(self, model, pseudo_label_loader, device):
         # add labels to the unlabeled dataset
         # already_labeled: list of indices of images that have already been labeled
@@ -99,6 +112,8 @@ class DataModule:
         # get the predictions of the model on the unlabeled dataset
         model.to(device)
         model.eval()
+        print(f"Remaining: {len(self.remaining)}")
+        print(f"Already labeled: {len(self.already_labeled)}")
         if self.remaining == []:
             return pseudo_label_loader
         
@@ -168,22 +183,70 @@ class DataModule:
         assert len(indices) > 0 
         #print(f"indices: {indices}")
         
-        images = [remaining_loader.dataset[i] for i in indices]
-        images = torch.stack(images, dim=0)
-        targets = by_classes[:,0].int()
+        indices = indices.cpu()
+        targets = by_classes[:,0].cpu().int().tolist()
         #print(f"targets: {targets}")
         assert targets.shape == (len(indices),)
         # send images and targets back to the cpu for storage
-        images = images.cpu()
-        targets = targets.cpu()
 
-        new_dataset = torch.utils.data.TensorDataset(images, targets)
+        new_dataset = PseudoLabeledDataset(self.unlabeled_path, self.transform, self.batch_size, self.num_workers, indices, targets)
         # create a new dataloader with the newly labeled images
         if pseudo_label_loader is not None:
             # append the new dataloader to the pseudo_label_loader
             new_dataset = ConcatDataset([pseudo_label_loader.dataset, new_dataset])
         new_loader = DataLoader(new_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
         return new_loader
+
+    def add_labels2(self, model, pseudo_label_loader, device):
+        # add labels to the unlabeled dataset
+        # make one pass over the unlabeled dataset and add the top predictions to the dataset (if they are above a certain threshold)
+        model.eval()
+        model.eval()
+        print(f"Remaining: {len(self.remaining)}")
+        print(f"Already labeled: {len(self.already_labeled)}")
+        if self.remaining == []:
+            return pseudo_label_loader
+        
+        remaining_loader = DataLoader(Subset(self.unlabelled_dataset, self.remaining), batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        
+        scores, classes = torch.empty((0,1), device=device), torch.empty((0, 1), device=device)
+
+        with torch.no_grad():
+            for batch in tqdm(remaining_loader):
+                
+                batch = batch.to(device)
+                output = model(batch)
+                output = F.softmax(output, dim=1)
+
+                score, pred = torch.max(output, dim=1)
+                # score, pred have shape (batch_size, 1)
+                scores = torch.cat((scores, score.unsqueeze(1)), dim=0)
+                classes  = torch.cat((classes, pred.unsqueeze(1)), dim=0)
+                
+            idx = torch.arange(len(self.remaining), device=device)
+            # classes has shape (len(self.remaining), 1) and contains the top predictions for each image
+            # scores has shape (len(self.remaining), 1) and contains the scores of the top predictions for each image
+            # idx has shape (len(self.remaining),) and contains the indices of the images in the remaining dataset
+            new = torch.stack((idx, classes.squeeze(), scores.squeeze()), dim=1)
+            # new has shape (len(self.remaining), 3) and contains the indices, classes and scores of the top predictions for each image
+            new = new[new[:,2] > self.threshold]
+            indices  = new[:,0].cpu().int().tolist()
+            classes  = new[:,1].cpu().int().tolist()
+            
+            new_dataset = PseudoLabeledDataset(self.unlabeled_path, self.transform, self.batch_size, self.num_workers, indices, classes)
+            if pseudo_label_loader is not None:
+                # append the new dataloader to the pseudo_label_loader
+                new_dataset = ConcatDataset([pseudo_label_loader.dataset, new_dataset])
+            # create a new dataloader with the newly labeled images
+            new_loader = DataLoader(new_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+            # update the already labeled and remaining lists
+            self.already_labeled = list(set(self.already_labeled) | set(indices))
+            self.remaining = list(set(self.remaining) - set(self.already_labeled))
+            return new_loader
+
+            
+
+
 
     def reset_labels(self):
         # reset the labels of the dataset
@@ -214,7 +277,18 @@ class DataModule:
         new_dataset = ConcatDataset([train_loader.dataset, new_dataset])
         new_loader = DataLoader(new_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
         return new_loader
-
+    
+    def dset_rotnet(self, cross = False):
+        #  return a train, validation dataloader based on 80/20 split of the unlabeled dataset
+        
+        #  split the unlabeled dataset into train and validation
+        if cross == False: 
+            return DataLoader(self.unlabelled_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers), None
+        else:
+            train, val = torch.utils.data.random_split(self.unlabelled_dataset, [int(0.8*len(self.unlabelled_dataset)), int(0.2*len(self.unlabelled_dataset))])
+            train_loader = DataLoader(train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+            val_loader = DataLoader(val, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+            return train_loader, val_loader
 
 
 
@@ -235,6 +309,24 @@ class UnlabeledDataset(Dataset):
         img = self.transform(img)
         return img
     
+class PseudoLabeledDataset(Dataset):
+    def __init__(self, dataset_path, transform, batch_size, num_workers, indices, classes):
+        self.dataset_path = dataset_path
+        self.transform = transform
+        self.images = os.listdir(dataset_path)
+        self.batch_size = batch_size
+        self.indices = indices
+        self.classes = classes
+        self.num_workers = num_workers
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+
+        img = Image.open(os.path.join(self.dataset_path, self.images[self.indices[idx]]))
+        img = self.transform(img)
+        return img, torch.Tensor([self.classes[self.indices[idx]]]).int()
 
 if __name__ == "__main__":
     a = torch.randn(4, 4)

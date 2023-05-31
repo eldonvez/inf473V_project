@@ -122,6 +122,7 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
     pseudo_loader = None
     for epoch in tqdm(range(pseudolabeling_epochs)):
         pseudo_loader = datamodule.add_labels2(teacher, pseudo_loader, device)
+        torch.cuda.empty_cache()
         
         teacher.train()
         epoch_loss = 0
