@@ -7,15 +7,18 @@ defaults:
 
 warmup_epochs: 40
 pseudolabeling_epochs: 40
-student_epochs: 10
+student_epochs: 100
 max_weight: 1 
 self_train: False
 cross_validation: True
 
 
 rotnet: 
-  _target_: models.rotnet.RotNet
-rotnet_epochs: 100
+  _target_: models.alexnet.AlexNet
+  num_classes: 4
+  frozen: False
+  pretrained: False
+rotnet_epochs: 5
 
 datamodule:
   _target_: data.datamodule.DataModule
@@ -30,7 +33,7 @@ test_path: ${data_dir}/${dataset.test_path}
 data_dir: ${root_dir}/compressed_dataset
 root_dir:  ${hydra:runtime.cwd}
 checkpoints_dir: ${root_dir}/checkpoints
-checkpoint_path: ${checkpoints_dir}/dataset=train_better,pseudolabeling_epochs=40,student=alexnet,teacher=vggnet,warmup_epochs=40_0teacher_epoch_30.pth
+checkpoint_path: ${checkpoints_dir}/dataset=train,pseudolabeling_epochs=clear10,student=alexnet,teacher=vggnet,warmup_epochs=40rotnetstudent_finetuned.pth
 
 hydra:
   run:

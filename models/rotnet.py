@@ -27,7 +27,7 @@ class GlobalAveragePooling(nn.Module):
         return F.avg_pool2d(feat, (feat.size(2), feat.size(3))).view(-1, num_channels)
 
 class RotNet(nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes=4):
         super(RotNet, self).__init__()
 
         num_classes = 4
@@ -50,7 +50,7 @@ class RotNet(nn.Module):
         early_features[1].add_module('Block2_ConvB2',  BasicBlock(nChannels,  nChannels, 1))
         early_features[1].add_module('Block2_ConvB3',  BasicBlock(nChannels,  nChannels, 1))
         early_features[1].add_module('Block2_AvgPool', nn.AvgPool2d(kernel_size=3,stride=2,padding=1))
-        latent_features = [nn.Sequential() for _ in range(4)]
+        latent_features = [nn.Sequential() for _ in range(3)]
         # last two conv layers before global average pooling
         latent_features[0].add_module('Block3_ConvB1',  BasicBlock(nChannels, nChannels, 3))
         latent_features[0].add_module('Block3_ConvB2',  BasicBlock(nChannels, nChannels, 1))
@@ -62,16 +62,18 @@ class RotNet(nn.Module):
         latent_features[1].add_module('Block4_ConvB2',  BasicBlock(nChannels, nChannels, 1))
         latent_features[1].add_module('Block4_ConvB3',  BasicBlock(nChannels, nChannels, 1))
 
-        latent_features[2].add_module('Block5_ConvB1',  BasicBlock(nChannels, nChannels, 3))
-        latent_features[2].add_module('Block5_ConvB2',  BasicBlock(nChannels, nChannels, 1))
-        latent_features[2].add_module('Block5_ConvB3',  BasicBlock(nChannels, nChannels, 1))
+        # latent_features[2].add_module('Block5_ConvB1',  BasicBlock(nChannels, nChannels, 3))
+        # latent_features[2].add_module('Block5_ConvB2',  BasicBlock(nChannels, nChannels, 1))
+        # latent_features[2].add_module('Block5_ConvB3',  BasicBlock(nChannels, nChannels, 1))
 
-        latent_features[3].add_module('GlobalAveragePooling',  GlobalAveragePooling())
-        latent_features[3].add_module('Classifier', nn.Linear(nChannels, num_classes))
+        latent_features[2].add_module('GlobalAveragePooling',  GlobalAveragePooling())
+        latent_features[2].add_module('Classifier', nn.Linear(nChannels, num_classes))
 
         self.early_features = nn.Sequential(*early_features)
         self.latent_features = nn.Sequential(*latent_features)
         self.classifier = nn.Sequential(nn.Identity())
+        # print total memory size of the model
+        print('Memory size of the model: {} MB'.format(sum(p.numel() for p in self.parameters())/1000000.0))
 
     def to_classifier(self, num_classes):
         # replace latent features with identity

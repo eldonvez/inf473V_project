@@ -31,7 +31,7 @@ class DataModule:
         self.transform = train_transform
         self.unlabelled_dataset = UnlabeledDataset(unlabeled_dataset_path, train_transform, batch_size, num_workers)
         # for debugging purposes, we only use a small subset of the unlabeled dataset
-        self.unlabelled_dataset = Subset(self.unlabelled_dataset, list(range(0, 10000)))
+        #self.unlabelled_dataset = Subset(self.unlabelled_dataset, list(range(0, 10000)))
         self.num_workers = num_workers
         self.batch_size = batch_size
         self.already_labeled = []
@@ -285,7 +285,7 @@ class DataModule:
         if cross == False: 
             return DataLoader(self.unlabelled_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
         else:
-            train, val = torch.utils.data.random_split(self.unlabelled_dataset, [int(0.8*len(self.unlabelled_dataset)), int(0.2*len(self.unlabelled_dataset))])
+            train, val = torch.utils.data.random_split(self.unlabelled_dataset, [0.8, 0.2])
             train_loader = DataLoader(train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
             val_loader = DataLoader(val, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
             return train_loader, val_loader

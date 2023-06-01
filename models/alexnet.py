@@ -26,6 +26,21 @@ class AlexNet(nn.Module):
             param.requires_grad = False
         for param in self.backbone.classifier.parameters():
             param.requires_grad = True
+
+    def to_classifier(self, num_classes):
+        # create a new classifier
+        self.backbone.classifier = nn.Sequential(
+            nn.Dropout(0.5),
+            nn.Linear(9216, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),
+            nn.Linear(4096, num_classes),
+        )
+        return
+        
             
 if __name__ == "__main__":
         model = AlexNet(48)

@@ -38,7 +38,9 @@ def create_submission(cfg):
         num_workers=cfg.dataset.num_workers,
     )
     # Load model and checkpoint
-    model = hydra.utils.instantiate(cfg.teacher).to(device)
+    model = hydra.utils.instantiate(cfg.rotnet)
+    model.to_classifier(48)
+    model.to(device)
     checkpoint = torch.load(cfg.checkpoint_path)
     model.load_state_dict(checkpoint)
     class_names = sorted(os.listdir(cfg.datamodule.train_dataset_path))
