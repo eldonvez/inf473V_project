@@ -5,12 +5,17 @@ defaults:
   - optimizer: adamw
   - criterion: cross_entropy
 
-
 warmup_epochs: 40
-pseudolabeling_epochs: 10
+pseudolabeling_epochs: 40
+student_epochs: 10
 max_weight: 1 
 self_train: False
 cross_validation: True
+
+
+rotnet: 
+  _target_: models.rotnet.RotNet
+rotnet_epochs: 100
 
 datamodule:
   _target_: data.datamodule.DataModule
@@ -20,9 +25,12 @@ datamodule:
   batch_size: 128
   num_workers: 6
 
+test_path: ${data_dir}/${dataset.test_path}
 
 data_dir: ${root_dir}/compressed_dataset
 root_dir:  ${hydra:runtime.cwd}
+checkpoints_dir: ${root_dir}/checkpoints
+checkpoint_path: ${checkpoints_dir}/dataset=train_better,pseudolabeling_epochs=40,student=alexnet,teacher=vggnet,warmup_epochs=40_0teacher_epoch_30.pth
 
 hydra:
   run:

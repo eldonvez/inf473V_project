@@ -2,7 +2,8 @@ defaults:
   - transform: simple
 num_classes: 48
 batch_size: 128
-num_workers: 8
+num_workers: 6
 train_path: train
 unlabeled_path: unlabelled
 test_path: test 
+test_transform: ${dataset.transform}

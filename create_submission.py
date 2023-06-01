@@ -31,17 +31,17 @@ class TestDataset(Dataset):
 def create_submission(cfg):
     test_loader = DataLoader(
         TestDataset(
-            cfg.dataset.test_path, hydra.utils.instantiate(cfg.dataset.test_transform)
+            cfg.test_path, hydra.utils.instantiate(cfg.dataset.test_transform)
         ),
         batch_size=cfg.dataset.batch_size,
         shuffle=False,
         num_workers=cfg.dataset.num_workers,
     )
     # Load model and checkpoint
-    model = hydra.utils.instantiate(cfg.model).to(device)
+    model = hydra.utils.instantiate(cfg.teacher).to(device)
     checkpoint = torch.load(cfg.checkpoint_path)
     model.load_state_dict(checkpoint)
-    class_names = sorted(os.listdir(cfg.dataset.train_path))
+    class_names = sorted(os.listdir(cfg.datamodule.train_dataset_path))
 
     # Create submission.csv
     submission = pd.DataFrame(columns=["id", "label"])

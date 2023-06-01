@@ -21,7 +21,7 @@ class DataModule:
         num_workers,
         top_k=80,
         top_p=5,
-        threshold=0.9,
+        threshold=0.85,
     ):
         self.num_classes = len(os.listdir(train_dataset_path))
         self.labeled_dataset = ImageFolder(train_dataset_path, transform=train_transform)
@@ -168,9 +168,6 @@ class DataModule:
         by_classes = torch.cat((class_id,by_classes), dim=2)
         by_classes = by_classes.reshape(-1, 3)
 
-        if self.threshold > 0:
-            # filter by threshold
-            by_classes = by_classes[by_classes[:,2] > self.threshold]
         # remove the entries with zero score
         by_classes = by_classes[by_classes[:,2] > 0]
         # update the already labeled and remaining lists, making sure to cast floating point indices to integers
@@ -238,10 +235,12 @@ class DataModule:
                 # append the new dataloader to the pseudo_label_loader
                 new_dataset = ConcatDataset([pseudo_label_loader.dataset, new_dataset])
             # create a new dataloader with the newly labeled images
-            new_loader = DataLoader(new_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
-            # update the already labeled and remaining lists
             self.already_labeled = list(set(self.already_labeled) | set(indices))
+            print("Added {} new labels for classes {}".format(len(indices), set(classes)))
             self.remaining = list(set(self.remaining) - set(self.already_labeled))
+            
+            new_loader = DataLoader(new_dataset, batch_size=self.batch_size, shuffle=(True if len(new_dataset) >0 else False), num_workers=self.num_workers)
+            # update the already labeled and remaining lists
             return new_loader
 
             
@@ -258,32 +257,33 @@ class DataModule:
         # label all the images in the unlabeled dataset
         # return a new dataloader with all the images
         loader = DataLoader(self.unlabelled_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
-        scores, classes = torch.Tensor([]), torch.Tensor([])
+        classes = torch.empty((0, 1), device=device)
+
         with torch.no_grad():
-            for batch in loader:
+            for batch in tqdm(loader):
                 batch = batch.to(device)
                 output = model(batch)
                 # for each image, get the top prediction
                 _, pred = torch.max(output, dim=1, keepdim=True)
                 # pred has shape (batch_size, 1)
-                classes = torch.cat((classes, pred), dim=0)
+                classes  = torch.cat((classes, pred), dim=0)
         # classes has shape (len(unlabelled_dataset), 1)
         # create a new dataset with the newly labeled images
-        images = [loader.dataset[i] for i in range(len(loader.dataset))]
-        images = torch.stack(images, dim=0)
-        targets = classes.int()
-        targets = torch.stack(targets, dim=0)
-        new_dataset = torch.utils.data.TensorDataset(images, targets)
+        indices = list(range(len(self.unlabelled_dataset)))
+        targets = classes.squeeze().cpu().int().tolist()
+        new_dataset = PseudoLabeledDataset(self.unlabeled_path, self.transform, self.batch_size, self.num_workers, indices, targets)
         new_dataset = ConcatDataset([train_loader.dataset, new_dataset])
         new_loader = DataLoader(new_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+
+    
         return new_loader
     
-    def dset_rotnet(self, cross = False):
+    def dloader_rotnet(self, cross = False):
         #  return a train, validation dataloader based on 80/20 split of the unlabeled dataset
         
         #  split the unlabeled dataset into train and validation
         if cross == False: 
-            return DataLoader(self.unlabelled_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers), None
+            return DataLoader(self.unlabelled_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
         else:
             train, val = torch.utils.data.random_split(self.unlabelled_dataset, [int(0.8*len(self.unlabelled_dataset)), int(0.2*len(self.unlabelled_dataset))])
             train_loader = DataLoader(train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
@@ -320,13 +320,14 @@ class PseudoLabeledDataset(Dataset):
         self.num_workers = num_workers
 
     def __len__(self):
-        return len(self.images)
+        return len(self.indices)
 
     def __getitem__(self, idx):
-
+        #print(f'idx: {idx}, len indices: {len(self.indices)}, indices: {self.indices}')
         img = Image.open(os.path.join(self.dataset_path, self.images[self.indices[idx]]))
         img = self.transform(img)
-        return img, torch.Tensor([self.classes[self.indices[idx]]]).int()
+        #print(f'index: {idx}, class: {self.classes[idx]}')
+        return img, self.classes[idx]
 
 if __name__ == "__main__":
     a = torch.randn(4, 4)

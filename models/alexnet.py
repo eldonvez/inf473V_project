@@ -21,6 +21,12 @@ class AlexNet(nn.Module):
         x = self.backbone(x)
         return x
     
+    def freeze(self):
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+        for param in self.backbone.classifier.parameters():
+            param.requires_grad = True
+            
 if __name__ == "__main__":
         model = AlexNet(48)
         print(model)
