@@ -264,6 +264,12 @@ class DataModule:
 
             
     def join(self, loader1, loader2):
+        # join two dataloaders
+        if loader1 is None:
+            return loader2
+        if loader2 is None:
+            return loader1
+        
         return DataLoader(ConcatDataset([loader1.dataset, loader2.dataset]), batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=True)
 
 
