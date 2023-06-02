@@ -3,6 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+### The definition of the model is pretty much a clone of the original RotNet paper and their github repo
+
+
 class BasicBlock(nn.Module):
     def __init__(self, in_planes, out_planes, kernel_size):
         super(BasicBlock, self).__init__()
