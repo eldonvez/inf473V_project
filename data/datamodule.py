@@ -21,7 +21,7 @@ class DataModule:
         num_workers,
         top_k=80,
         top_p=5,
-        threshold=0.85,
+        threshold=0.8,
     ):
         self.num_classes = len(os.listdir(train_dataset_path))
         self.labeled_dataset = ImageFolder(train_dataset_path, transform=train_transform)
@@ -62,31 +62,26 @@ class DataModule:
         split = len(self.labeled_dataset) // n_folds
 
         # shuffle the dataset before splitting
-        # torch.manual_seed(69)
-        # self.labeled_dataset = torch.utils.data.random_split(self.labeled_dataset, [split]*n_folds)
-
+        np.random.seed(69)
+        indices = np.arange(len(self.labeled_dataset))
+        np.random.shuffle(indices)
+        indices = list(indices)
 
         folds = []
         for i in range(n_folds):
             train_loader = DataLoader(
-                Subset(self.labeled_dataset,
-                            list(range(0, i*split)) + list(range((i+1)*split, len(self.labeled_dataset)))),
-                batch_size=self.batch_size, 
-                shuffle=shuffle, 
-                num_workers=self.num_workers
-                )
-            val_loader = DataLoader(
-                Subset(self.labeled_dataset, 
-                            list(range(i*split, (i+1)*split))),
+                Subset(self.labeled_dataset, indices[:i*split] + indices[(i+1)*split:]),
                 batch_size=self.batch_size,
-                shuffle=shuffle,
-                num_workers=self.num_workers
-                )
-            
+                shuffle=True,
+                num_workers=self.num_workers,
+            )
+            val_loader = DataLoader(
+                Subset(self.labeled_dataset, indices[i*split:(i+1)*split]),
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=self.num_workers,
+            )
             folds.append((train_loader, val_loader))
-            # print the class distribution of the train and validation sets
-            print(f"Fold {i}:")
-            print ("Train set:")
         return folds
     
     def print_class_distribution(self, output_file=None):
@@ -105,7 +100,10 @@ class DataModule:
     
     def get_class_weights(self,dataset):
         # return the class distribution of the dataset as a tensor of size (num_classes,) for balancing the loss
-        _, counts = np.unique(dataset.targets, return_counts=True)
+        if isinstance(dataset, Subset):
+            _, counts = np.unique([dataset.dataset.targets[i] for i in dataset.indices], return_counts=True)
+        else:
+            _, counts = np.unique(dataset.targets, return_counts=True)
         # weight the samples as the inverse of the class frequency for the class they belong to.
         # the weight of a class is the number of samples in the most populated class divided by the number of samples in the current class
         weight = torch.tensor([max(counts)/count for count in counts])
@@ -114,7 +112,15 @@ class DataModule:
 
         return weight
     
+    def get_class_distribution(self,dataset):
+        if isinstance(dataset, Subset):
+            class_id, counts = np.unique([dataset.dataset.targets[i] for i in dataset.indices], return_counts=True)
+        else:
+            class_id, counts = np.unique(dataset.targets, return_counts=True)
 
+        class_id = class_id.tolist()
+        counts = counts.tolist()
+        return class_id, counts
     
     def add_labels(self, model, pseudo_label_loader, device):
         # add labels to the unlabeled dataset
@@ -257,7 +263,8 @@ class DataModule:
             return new_loader
 
             
-
+    def join(self, loader1, loader2):
+        return DataLoader(ConcatDataset([loader1.dataset, loader2.dataset]), batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=True)
 
 
     def reset_labels(self):

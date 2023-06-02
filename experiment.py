@@ -8,6 +8,7 @@ from hydra.core.hydra_config import HydraConfig
 import os
 import gc
 import matplotlib.pyplot as plt
+import torch.utils.data as data
 
 @hydra.main(config_path="configs", config_name="config")
 def main(cfg): 
@@ -55,7 +56,9 @@ def main(cfg):
 
     if cfg.cross_validation == False:
         checkpoint_path = os.path.join(hydra.utils.get_original_cwd(), "checkpoints/" + run_name)
-        train_teacher(teacher, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path)
+        pseudo_loader = train_teacher(teacher, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path)
+        # concat train_loader and pseudo_loader
+        train_loader = datamodule.join(train_loader, pseudo_loader)
         train_student(teacher, student, train_loader, datamodule, logger, optimizer_student, criterion, device, cfg.student_epochs, checkpoint_path, val_loader)
         student.freeze()
         finetune_student(student, cfg.student_epochs, optimizer_student, criterion, device, train_loader, logger, checkpoint_path)
@@ -68,13 +71,17 @@ def main(cfg):
             root = os.path.join(hydra.utils.get_original_cwd(), "checkpoints/")
             checkpoint_path = os.path.join(hydra.utils.get_original_cwd(), "checkpoints/"+run_name+"_"+str(i))
             # get class distribution of train_loader and val_loader
-            train_class_distribution = datamodule.get_class_counts(train_loader.dataset)
-            val_class_distribution = datamodule.get_class_counts(val_loader.dataset)
+            train_class_distribution = datamodule.get_class_distribution(train_loader.dataset)
+            val_class_distribution = datamodule.get_class_distribution(val_loader.dataset)
             print (train_class_distribution)
             print (val_class_distribution)
-            train_teacher(teacher, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path, val_loader)
+            pseudo_loader = train_teacher(teacher, train_loader, datamodule, logger, optimizer, criterion, device, cfg.warmup_epochs, cfg.pseudolabeling_epochs, cfg.max_weight, checkpoint_path, val_loader)
             print_sample(val_loader, teacher, root, device, class_names)
             print_sample(train_loader, teacher, root, device, class_names)
+            # concat train_loader and pseudo_loader
+            train_loader = datamodule.join(train_loader, pseudo_loader)
+
+
             train_student(teacher, student, train_loader, datamodule, logger, optimizer_student, criterion, device, cfg.student_epochs, checkpoint_path, val_loader)
             student.freeze()
             finetune_student(student, cfg.student_epochs, optimizer_student, criterion, device, train_loader, logger, checkpoint_path,val_loader= val_loader)
@@ -155,109 +162,109 @@ def train_teacher(teacher, train_loader, datamodule, logger,  optimizer, criteri
             if epoch % 10 == 0:
                 torch.save(teacher.state_dict(), checkpoint_path+"teacher_epoch_"+str(epoch)+".pth")
     # pseudo-labeling
-    # pseudo_loader = None
-    # for epoch in tqdm(range(pseudolabeling_epochs)):
-    #     if epoch % 10 == 0:
-    #         torch.cuda.empty_cache()
-    #         pseudo_loader = datamodule.add_labels2(teacher, pseudo_loader, device)
-    #         teacher.train()
+    pseudo_loader = None
+    for epoch in tqdm(range(pseudolabeling_epochs)):
+        if epoch % 10 == 0:
+            torch.cuda.empty_cache()
+            pseudo_loader = datamodule.add_labels2(teacher, pseudo_loader, device)
+            teacher.train()
         
-    #     epoch_loss = 0
-    #     epoch_num_correct = 0
-    #     num_samples = 0
-    #     pseudo_loss_weight = max_weight * (epoch / pseudolabeling_epochs)
-    #     #print(pseudo_loader.dataset[0])
-    #     teacher.to(device)
-    #     for j , (batch, pseudo_batch) in tqdm(enumerate(itertools.zip_longest(train_loader, pseudo_loader))):
-    #         if pseudo_batch is None:
-    #             images, labels = batch
-    #             images = images.to(device)
-    #             labels = labels.to(device)
-    #             preds = teacher(images)
-    #             loss = criterion(preds, labels)
-    #             epoch_loss += loss.detach().cpu().numpy() * len(images)
-    #             epoch_num_correct += (preds.argmax(1) == labels).sum().detach().cpu().numpy()
-    #             num_samples +=len(images)
+        epoch_loss = 0
+        epoch_num_correct = 0
+        num_samples = 0
+        pseudo_loss_weight = max_weight * (epoch / pseudolabeling_epochs)
+        #print(pseudo_loader.dataset[0])
+        teacher.to(device)
+        for j , (batch, pseudo_batch) in tqdm(enumerate(itertools.zip_longest(train_loader, pseudo_loader))):
+            if pseudo_batch is None:
+                images, labels = batch
+                images = images.to(device)
+                labels = labels.to(device)
+                preds = teacher(images)
+                loss = criterion(preds, labels)
+                epoch_loss += loss.detach().cpu().numpy() * len(images)
+                epoch_num_correct += (preds.argmax(1) == labels).sum().detach().cpu().numpy()
+                num_samples +=len(images)
 
-    #         elif batch is None:
-    #             pseudo_images, pseudo_labels = pseudo_batch
-    #             pseudo_images = pseudo_images.to(device)
-    #             pseudo_labels = pseudo_labels.type(torch.LongTensor).to(device)
-    #             pseudo_preds = teacher(pseudo_images)
-    #             loss = pseudo_loss_weight * criterion(pseudo_preds, pseudo_labels)
-    #             epoch_loss += loss.detach().cpu().numpy() * len(pseudo_images)
-    #             epoch_num_correct += (pseudo_preds.argmax(1) == pseudo_labels).sum().detach().cpu().numpy()
-    #             num_samples +=len(pseudo_images)
+            elif batch is None:
+                pseudo_images, pseudo_labels = pseudo_batch
+                pseudo_images = pseudo_images.to(device)
+                pseudo_labels = pseudo_labels.type(torch.LongTensor).to(device)
+                pseudo_preds = teacher(pseudo_images)
+                loss = pseudo_loss_weight * criterion(pseudo_preds, pseudo_labels)
+                epoch_loss += loss.detach().cpu().numpy() * len(pseudo_images)
+                epoch_num_correct += (pseudo_preds.argmax(1) == pseudo_labels).sum().detach().cpu().numpy()
+                num_samples +=len(pseudo_images)
 
 
 
-    #         else: 
-    #             images, labels = batch
-    #             pseudo_images, pseudo_labels = pseudo_batch
-    #             images = images.to(device)
-    #             labels = labels.to(device)
-    #             pseudo_images = pseudo_images.to(device)
-    #             pseudo_labels = pseudo_labels.type(torch.LongTensor).to(device)
-    #             #print(type(images))
+            else: 
+                images, labels = batch
+                pseudo_images, pseudo_labels = pseudo_batch
+                images = images.to(device)
+                labels = labels.to(device)
+                pseudo_images = pseudo_images.to(device)
+                pseudo_labels = pseudo_labels.type(torch.LongTensor).to(device)
+                #print(type(images))
                 
-    #             preds = teacher(images)
-    #             pseudo_preds = teacher(pseudo_images)
-    #             loss = criterion(preds, labels)
-    #             # print(f"pseudo_preds type: {pseudo_preds.dtype}")
-    #             # print(f"labels type: {labels.dtype}")
+                preds = teacher(images)
+                pseudo_preds = teacher(pseudo_images)
+                loss = criterion(preds, labels)
+                # print(f"pseudo_preds type: {pseudo_preds.dtype}")
+                # print(f"labels type: {labels.dtype}")
 
-    #             pseudo_loss = criterion(pseudo_preds, pseudo_labels)
-    #             loss = loss + pseudo_loss_weight * pseudo_loss
-    #             epoch_loss += loss.detach().cpu().numpy() * (len (images) + len(pseudo_images))
-    #             epoch_num_correct += (
-    #                     (preds.argmax(1) == labels).sum().detach().cpu().numpy()
-    #                     + (pseudo_preds.argmax(1) == pseudo_labels).sum().detach().cpu().numpy()
-    #                 )
-    #             num_samples += len(images) + len(pseudo_images)
+                pseudo_loss = criterion(pseudo_preds, pseudo_labels)
+                loss = loss + pseudo_loss_weight * pseudo_loss
+                epoch_loss += loss.detach().cpu().numpy() * (len (images) + len(pseudo_images))
+                epoch_num_correct += (
+                        (preds.argmax(1) == labels).sum().detach().cpu().numpy()
+                        + (pseudo_preds.argmax(1) == pseudo_labels).sum().detach().cpu().numpy()
+                    )
+                num_samples += len(images) + len(pseudo_images)
 
-    #         optimizer.zero_grad()
-    #         loss.backward()
-    #         optimizer.step()
-    #     epoch_loss /= num_samples
-    #     epoch_acc = epoch_num_correct / num_samples
-    #     logger.log(
-    #         {
-    #             "epoch": epoch+ warmup_epochs,
-    #             "train_loss_epoch": epoch_loss,
-    #             "train_acc": epoch_acc,
-    #         }
-    #     )
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        epoch_loss /= num_samples
+        epoch_acc = epoch_num_correct / num_samples
+        logger.log(
+            {
+                "epoch": epoch+ warmup_epochs,
+                "train_loss_epoch": epoch_loss,
+                "train_acc": epoch_acc,
+            }
+        )
 
 
 
-    #     if val_loader is not None:
-    #         epoch_loss = 0
-    #         epoch_num_correct = 0
-    #         num_samples = 0
-    #         for j, batch in tqdm(enumerate(val_loader)):
-    #             images, labels = batch
-    #             images = images.to(device)
-    #             labels = labels.to(device)
-    #             preds = teacher(images)
-    #             loss = criterion(preds, labels)
-    #             epoch_loss += loss.detach().cpu().numpy() * len(images)
-    #             epoch_num_correct += (
-    #                 (preds.argmax(1) == labels).sum().detach().cpu().numpy()
-    #             )
-    #             num_samples += len(images)
-    #         epoch_loss /= num_samples
-    #         epoch_acc = epoch_num_correct / num_samples
-    #         logger.log(
-    #             {
-    #                 "epoch": epoch+ warmup_epochs,
-    #                 "val_loss_epoch": epoch_loss,
-    #                 "val_acc": epoch_acc,
-    #             }
-    #         )
-    #     if epoch % 10 == 0:
-    #         torch.save(teacher.state_dict(), checkpoint_path+"teacher_epoch"+str(epoch+warmup_epochs)+".pth")
-    # datamodule.reset_labels()
-
+        if val_loader is not None:
+            epoch_loss = 0
+            epoch_num_correct = 0
+            num_samples = 0
+            for j, batch in tqdm(enumerate(val_loader)):
+                images, labels = batch
+                images = images.to(device)
+                labels = labels.to(device)
+                preds = teacher(images)
+                loss = criterion(preds, labels)
+                epoch_loss += loss.detach().cpu().numpy() * len(images)
+                epoch_num_correct += (
+                    (preds.argmax(1) == labels).sum().detach().cpu().numpy()
+                )
+                num_samples += len(images)
+            epoch_loss /= num_samples
+            epoch_acc = epoch_num_correct / num_samples
+            logger.log(
+                {
+                    "epoch": epoch+ warmup_epochs,
+                    "val_loss_epoch": epoch_loss,
+                    "val_acc": epoch_acc,
+                }
+            )
+        if epoch % 10 == 0:
+            torch.save(teacher.state_dict(), checkpoint_path+"teacher_epoch"+str(epoch+warmup_epochs)+".pth")
+    #datamodule.reset_labels()
+    return pseudo_loader
         
 def train_student(teacher, student, train_loader, datamodule, logger, optimizer, criterion, device, epochs, checkpoint_path, val_loader=None):
     teacher.to(device)
@@ -267,7 +274,7 @@ def train_student(teacher, student, train_loader, datamodule, logger, optimizer,
     
     #print(train_loader.dataset[0][1])
 
-    train_loader = datamodule.label_all(teacher, train_loader,device)
+    # train_loader = datamodule.label_all(teacher, train_loader,device)
     
     #print(train_loader.dataset[1000][1])
     for epoch in tqdm(range(epochs)):
