@@ -31,7 +31,7 @@ class DataModule:
         self.transform = train_transform
         self.unlabelled_dataset = UnlabeledDataset(unlabeled_dataset_path, train_transform, batch_size, num_workers)
         # for debugging purposes, we only use a small subset of the unlabeled dataset
-        #self.unlabelled_dataset = Subset(self.unlabelled_dataset, list(range(0, 10000)))
+        self.unlabelled_dataset = Subset(self.unlabelled_dataset, list(range(0, 4800)))
         self.num_workers = num_workers
         self.batch_size = batch_size
         self.already_labeled = []
@@ -39,6 +39,7 @@ class DataModule:
         self.top_k = top_k
         self.top_p = top_p
         self.threshold = threshold
+        self.class_names = sorted(os.listdir(train_dataset_path))
 
     def dloader_labeled(self):
         return DataLoader(
@@ -59,6 +60,12 @@ class DataModule:
         # split the dataset into n_folds for cross validation
         # return a list of n_folds dataset pairs (train_set, val_set)
         split = len(self.labeled_dataset) // n_folds
+
+        # shuffle the dataset before splitting
+        # torch.manual_seed(69)
+        # self.labeled_dataset = torch.utils.data.random_split(self.labeled_dataset, [split]*n_folds)
+
+
         folds = []
         for i in range(n_folds):
             train_loader = DataLoader(
@@ -77,6 +84,9 @@ class DataModule:
                 )
             
             folds.append((train_loader, val_loader))
+            # print the class distribution of the train and validation sets
+            print(f"Fold {i}:")
+            print ("Train set:")
         return folds
     
     def print_class_distribution(self, output_file=None):
@@ -93,9 +103,9 @@ class DataModule:
         plt.show()
         return
     
-    def get_class_weights(self):
+    def get_class_weights(self,dataset):
         # return the class distribution of the dataset as a tensor of size (num_classes,) for balancing the loss
-        _, counts = np.unique(self.labeled_dataset.targets, return_counts=True)
+        _, counts = np.unique(dataset.targets, return_counts=True)
         # weight the samples as the inverse of the class frequency for the class they belong to.
         # the weight of a class is the number of samples in the most populated class divided by the number of samples in the current class
         weight = torch.tensor([max(counts)/count for count in counts])
@@ -103,6 +113,9 @@ class DataModule:
         weight = weight.type(torch.float32)
 
         return weight
+    
+
+    
     def add_labels(self, model, pseudo_label_loader, device):
         # add labels to the unlabeled dataset
         # already_labeled: list of indices of images that have already been labeled
@@ -236,7 +249,7 @@ class DataModule:
                 new_dataset = ConcatDataset([pseudo_label_loader.dataset, new_dataset])
             # create a new dataloader with the newly labeled images
             self.already_labeled = list(set(self.already_labeled) | set(indices))
-            print("Added {} new labels for classes {}".format(len(indices), set(classes)))
+            print("Added {} new labels for classes {}".format(len(indices), set(self.class_names[i] for i in classes)))
             self.remaining = list(set(self.remaining) - set(self.already_labeled))
             
             new_loader = DataLoader(new_dataset, batch_size=self.batch_size, shuffle=(True if len(new_dataset) >0 else False), num_workers=self.num_workers)
